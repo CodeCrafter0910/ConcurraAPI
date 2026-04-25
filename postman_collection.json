@@ -1,0 +1,157 @@
+{
+  "info": {
+    "_postman_id": "a3f21c89-7b14-4e90-bc12-d3a0e5f84c11",
+    "name": "Grid07 Social API",
+    "description": "Collection for testing the Spring Boot Social API with Redis guardrails.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080"
+    }
+  ],
+  "item": [
+    {
+      "name": "Posts",
+      "item": [
+        {
+          "name": "Create Post (User)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/posts",
+              "host": ["{{base_url}}"],
+              "path": ["api", "posts"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"authorId\": 1,\n  \"authorType\": \"USER\",\n  \"content\": \"Just found an amazing hiking trail near the city. Highly recommend checking it out this weekend!\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Create Post (Bot)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/posts",
+              "host": ["{{base_url}}"],
+              "path": ["api", "posts"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"authorId\": 1,\n  \"authorType\": \"BOT\",\n  \"content\": \"Trending now: Top 5 productivity hacks for remote developers.\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Comments",
+      "item": [
+        {
+          "name": "Add Human Comment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/posts/1/comments",
+              "host": ["{{base_url}}"],
+              "path": ["api", "posts", "1", "comments"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"authorId\": 2,\n  \"authorType\": \"USER\",\n  \"content\": \"This is really helpful, thanks!\",\n  \"depthLevel\": 1,\n  \"postOwnerId\": 1\n}"
+            }
+          }
+        },
+        {
+          "name": "Add Bot Comment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/posts/1/comments",
+              "host": ["{{base_url}}"],
+              "path": ["api", "posts", "1", "comments"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"authorId\": 1,\n  \"authorType\": \"BOT\",\n  \"content\": \"Great insight! Our analysis shows similar patterns in Q3 engagement data.\",\n  \"depthLevel\": 1,\n  \"postOwnerId\": 1\n}"
+            }
+          }
+        },
+        {
+          "name": "Add Bot Comment (Depth Limit Test - depth 21)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/posts/1/comments",
+              "host": ["{{base_url}}"],
+              "path": ["api", "posts", "1", "comments"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"authorId\": 2,\n  \"authorType\": \"BOT\",\n  \"content\": \"This comment should be rejected.\",\n  \"depthLevel\": 21,\n  \"postOwnerId\": 1\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Likes",
+      "item": [
+        {
+          "name": "Like Post (Human)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/posts/1/like",
+              "host": ["{{base_url}}"],
+              "path": ["api", "posts", "1", "like"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": 2,\n  \"userType\": \"USER\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Like Post (Bot)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/posts/1/like",
+              "host": ["{{base_url}}"],
+              "path": ["api", "posts", "1", "like"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": 1,\n  \"userType\": \"BOT\"\n}"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
