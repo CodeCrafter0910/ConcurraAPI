@@ -1,123 +1,94 @@
-# ConcurraAPI
+# Social API
 
-This is my submission for the Grid07 backend engineering assignment. I built this as a Spring Boot microservice that manages posts, comments and likes. The interesting part of this project is the Redis layer which I used to handle real-time scoring and to enforce strict concurrency limits on bot activity.
+A Spring Boot REST API for managing posts, comments, and likes with Redis-based rate limiting and notification batching.
 
-GitHub: https://github.com/CodeCrafter0910/ConcurraAPI
+## Setup
 
----
+You'll need Docker installed. Clone the repo and run:
 
-## Running the project
-
-Docker is the only thing you need on your machine. Once you have it, clone the repo and run this:
-
-```
-git clone https://github.com/CodeCrafter0910/ConcurraAPI.git
-cd ConcurraAPI
+```bash
 docker-compose up --build
 ```
 
-This will start three containers together: the Spring Boot app, Postgres and Redis. The first time it boots up it will also insert some sample users and bots automatically so you have real data to test with right away. The API will be ready at http://localhost:8080.
+This starts the app along with Postgres and Redis. The API runs on `http://localhost:8080`.
 
-If you prefer running it without Docker, you will need Java 21 with Postgres and Redis running locally. Then just run:
+If you want to run it locally without Docker, make sure you have Java 21, Postgres, and Redis running. Then:
 
-```
+```bash
 mvn spring-boot:run
 ```
 
-The config file already defaults to localhost for both services so nothing extra needs to be changed.
+## Endpoints
 
----
-
-## API endpoints
-
-Create a post
-
+**Create a post**
 ```
 POST /api/posts
-
 {
   "authorId": 1,
   "authorType": "USER",
-  "content": "your post content"
+  "content": "your post text"
 }
 ```
 
-Add a comment
-
+**Add a comment**
 ```
 POST /api/posts/{postId}/comments
-
 {
   "authorId": 1,
   "authorType": "BOT",
-  "content": "comment content",
+  "content": "comment text",
   "depthLevel": 1,
   "postOwnerId": 1
 }
 ```
 
-When the comment is from a bot, postOwnerId tells the system whose post is being replied to. This is used for the cooldown check and for routing notifications.
-
-Like a post
-
+**Like a post**
 ```
 POST /api/posts/{postId}/like
-
 {
   "userId": 2,
   "userType": "USER"
 }
 ```
 
-The response includes the current virality score for that post which is calculated and stored in Redis.
+There's a `postman_collection.json` file you can import to test everything.
 
-I have included a postman_collection.json file in the root of the repo. You can import it directly into Postman and all the requests are already configured with sample bodies.
+## How it works
 
----
+### Virality scoring
+Each interaction updates a score in Redis:
+- Bot comment: +1
+- User like: +20
+- User comment: +50
 
-## How I handled the concurrency problem
+### Bot limits
+Bots can't spam. There are three rules:
+1. Max 100 bot comments per post
+2. Comment threads can't go deeper than 20 levels
+3. A bot can only interact with the same user once every 10 minutes
 
-This section explains how I made sure the bot limits hold even under heavy concurrent traffic, which was the most important requirement in the assignment.
+These limits are enforced using Redis. The counter for bot comments uses Redis INCR which is atomic, so even if 200 requests hit at once, only 100 will get through. If the counter goes over 100, it gets decremented immediately and the request fails.
 
-The main challenge was the horizontal cap: a post should never have more than 100 bot comments. The obvious approach of checking a counter in Java or doing a read-then-write in Postgres will not work when many requests come in at the same time. Two threads can both read the counter as 99, both think there is space, and both write at the same time pushing the total to 101. This is a classic race condition.
+For the cooldown, I use Redis keys with a 10 minute TTL. If the key exists, the bot is blocked.
 
-My solution was to move the counter entirely into Redis and use the INCR command. INCR is atomic, meaning Redis processes it as a single uninterruptible operation. Every incoming bot comment request increments the counter at post:{id}:bot_count first, before any other logic runs. The return value is unique for each caller so no two requests can ever get the same number back. If the returned number is above 100, I immediately decrement it back and send a 429 response. If it is 100 or below, the request is allowed through. This way the 100th request goes in and the 101st is blocked every single time, no exceptions.
+### Notifications
+When a bot interacts with a user's post, the system checks if that user got a notification in the last 15 minutes. If yes, the notification gets queued in Redis. If no, it sends immediately and starts a 15 minute cooldown.
 
-I also made sure the database and Redis stay in sync. If the Redis check passes but the Postgres write fails for any reason, I decrement the counter back before throwing the error. Without this step the counter would drift above the real comment count over time.
+A background job runs every 5 minutes to check for queued notifications. If it finds any, it sends one combined message like "Bot X and 3 others interacted with your posts" instead of spamming the user.
 
-For the cooldown check (one bot cannot interact with the same user more than once every 10 minutes) I used Redis setIfAbsent. This creates a key with a TTL only if that key does not already exist. The key is cooldown:bot_{botId}:human_{humanId}. If the key is created successfully the bot is allowed. If the key already exists the bot gets a 429. This is also a single atomic operation so two concurrent requests from the same bot cannot both pass at the same time.
-
-One edge case I handled here: if the cooldown blocks a request that already passed the horizontal cap check, I release the bot slot before returning the error. This keeps the counter accurate.
-
-The depth limit (no thread deeper than 20 levels) does not need Redis because it is just checking a number from the request body against a fixed limit. There is no shared state involved.
-
----
-
-## Notification engine
-
-When a bot replies to a post, the service checks a Redis key to see if that user was notified in the last 15 minutes. If they were not, the notification is logged immediately and a cooldown key is set. If the user is still within the 15 minute window, the message is added to a Redis list at user:{id}:pending_notifs instead.
-
-Every 5 minutes a scheduled background task wakes up and checks if any users have messages sitting in their pending list. For each user it finds, it reads all the messages, logs one combined summary such as "Bot TrendBot and 2 others interacted with your posts" and then clears the list. This keeps users from getting flooded with individual notifications every time a bot touches their content.
-
----
-
-## Code structure
+## Project structure
 
 ```
 src/main/java/com/grid07/socialapi/
-    config/       Redis setup, seed data loader
-    controller/   REST endpoints
-    dto/          Request body classes
-    entity/       User, Bot, Post, Comment
-    repository/   Database access layer
-    scheduler/    Background notification sweeper
-    service/      Business logic for posts, comments, virality, locks and notifications
+  config/       - Redis config and data seeding
+  controller/   - REST endpoints
+  dto/          - Request objects
+  entity/       - Database models
+  repository/   - Data access
+  scheduler/    - Background notification job
+  service/      - Business logic
 ```
 
----
+## Tech stack
 
-## Tech used
-
-Java 21, Spring Boot 3.2.5, PostgreSQL 16, Redis 7, Docker and Docker Compose.
-
-Postgres holds all the actual content. Redis sits in front of it as the gatekeeper and handles all the counters, cooldowns, scores and queued notifications. The application itself holds no state in memory so it would scale horizontally without any issues.
+Java 21, Spring Boot 3.2.5, PostgreSQL, Redis, Docker

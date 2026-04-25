@@ -17,11 +17,11 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/posts")
 public class PostController {
-
+    
     private final PostService postService;
     private final CommentService commentService;
     private final ViralityService viralityService;
-
+    
     public PostController(PostService postService,
                           CommentService commentService,
                           ViralityService viralityService) {
@@ -29,20 +29,20 @@ public class PostController {
         this.commentService = commentService;
         this.viralityService = viralityService;
     }
-
+    
     @PostMapping
     public ResponseEntity<Post> createPost(@RequestBody PostRequest request) {
         Post created = postService.createPost(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
-
+    
     @PostMapping("/{postId}/comments")
     public ResponseEntity<Comment> addComment(@PathVariable Long postId,
                                               @RequestBody CommentRequest request) {
         Comment saved = commentService.addComment(postId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(saved);
     }
-
+    
     @PostMapping("/{postId}/like")
     public ResponseEntity<Map<String, Object>> likePost(@PathVariable Long postId,
                                                         @RequestBody LikeRequest request) {

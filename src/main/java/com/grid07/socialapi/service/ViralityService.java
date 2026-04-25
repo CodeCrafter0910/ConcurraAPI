@@ -5,13 +5,13 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class ViralityService {
-
+    
     private final RedisTemplate<String, String> redisTemplate;
-
+    
     public ViralityService(RedisTemplate<String, String> redisTemplate) {
         this.redisTemplate = redisTemplate;
     }
-
+    
     public void updateScore(Long postId, String interactionType) {
         String key = "post:" + postId + ":virality_score";
         switch (interactionType) {
@@ -20,10 +20,9 @@ public class ViralityService {
             case "HUMAN_COMMENT" -> redisTemplate.opsForValue().increment(key, 50);
         }
     }
-
+    
     public Long getScore(Long postId) {
         String raw = redisTemplate.opsForValue().get("post:" + postId + ":virality_score");
-        if (raw == null) return 0L;
-        return Long.parseLong(raw);
+        return raw == null ? 0L : Long.parseLong(raw);
     }
 }

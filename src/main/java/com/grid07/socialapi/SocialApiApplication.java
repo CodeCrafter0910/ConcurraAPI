@@ -7,7 +7,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @SpringBootApplication
 @EnableScheduling
 public class SocialApiApplication {
-
+    
     public static void main(String[] args) {
         SpringApplication.run(SocialApiApplication.class, args);
     }
